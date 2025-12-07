@@ -53,26 +53,48 @@ final class SnippetExpander {
 
     @discardableResult
     func reloadSnippets() -> Bool {
-        if fileManager.fileExists(atPath: snippetsURL.path) {
-            do {
-                let parsed = try parseKeyValueFile(at: snippetsURL)
-                snippets = parsed.isEmpty ? Self.defaultSnippets : parsed
-                print("Reloaded snippets from \(snippetsURL.path).")
-                return true
-            } catch {
-                fputs("Failed to read snippets from \(snippetsURL.path): \(error)\n", stderr)
-                snippets = Self.defaultSnippets
-                return false
-            }
-        } else {
+        guard ensureSnippetsFileExists() else {
             snippets = Self.defaultSnippets
+            return false
+        }
+
+        do {
+            let parsed = try parseKeyValueFile(at: snippetsURL)
+            snippets = parsed.isEmpty ? Self.defaultSnippets : parsed
+            print("Reloaded snippets from \(snippetsURL.path).")
             return true
+        } catch {
+            fputs("Failed to read snippets from \(snippetsURL.path): \(error)\n", stderr)
+            snippets = Self.defaultSnippets
+            return false
         }
     }
 
     func stop() {
         if let m = monitor {
             NSEvent.removeMonitor(m)
+        }
+    }
+}
+
+extension SnippetExpander {
+    @discardableResult
+    private func ensureSnippetsFileExists() -> Bool {
+        guard !fileManager.fileExists(atPath: snippetsURL.path) else { return true }
+
+        do {
+            let directoryURL = snippetsURL.deletingLastPathComponent()
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            let contents = Self.defaultSnippets
+                .sorted(by: { $0.key < $1.key })
+                .map { "\($0.key)=\($0.value)" }
+                .joined(separator: "\n") + "\n"
+            try contents.write(to: snippetsURL, atomically: true, encoding: .utf8)
+            print("Created default snippets file at \(snippetsURL.path).")
+            return true
+        } catch {
+            fputs("Failed to create default snippets file at \(snippetsURL.path): \(error)\n", stderr)
+            return false
         }
     }
 }
