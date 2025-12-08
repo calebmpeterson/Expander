@@ -51,6 +51,23 @@ final class SnippetExpander {
         print("SnippetExpander running. Type :smile: then space/return/tab.")
     }
 
+    func openSnippetsInTextEdit() {
+        guard ensureSnippetsFileExists() else { return }
+
+        let textEditURL = URL(fileURLWithPath: "/System/Applications/TextEdit.app")
+        let configuration = NSWorkspace.OpenConfiguration()
+
+        NSWorkspace.shared.open(
+            [snippetsURL],
+            withApplicationAt: textEditURL,
+            configuration: configuration
+        ) { _, error in
+            if let error {
+                fputs("Failed to open snippets in TextEdit: \(error)\n", stderr)
+            }
+        }
+    }
+
     @discardableResult
     func reloadSnippets() -> Bool {
         guard ensureSnippetsFileExists() else {
@@ -135,6 +152,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
+        let editItem = NSMenuItem(title: "Edit Snippets…", action: #selector(editSnippets), keyEquivalent: "e")
+        editItem.target = self
+        menu.addItem(editItem)
         let reloadItem = NSMenuItem(title: "Reload Snippets", action: #selector(reloadSnippets), keyEquivalent: "r")
         reloadItem.target = self
         menu.addItem(reloadItem)
@@ -148,6 +168,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func reloadSnippets() {
         expander.reloadSnippets()
+    }
+
+    @objc private func editSnippets() {
+        expander.openSnippetsInTextEdit()
     }
 
     @objc private func quitApp() {
